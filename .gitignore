@@ -1,0 +1,11 @@
+# Public Store Reports repository: only the executables and templates are published.
+# Your own configuration, keys and reports must never be committed here.
+config.yaml
+**/config.yaml
+**/credentials/apple/*.p8
+**/credentials/google/*.json
+**/reports/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.DS_Store

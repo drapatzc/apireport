@@ -1,0 +1,133 @@
+# ============================================================
+# Store Reports - configuration template
+# ============================================================
+# Copy this file to config.yaml and enter your real values there:
+#   cp config.example.yaml config.yaml
+# config.yaml is git-ignored and never committed. Keep it to pure values;
+# this file is the documentation.
+#
+# All relative paths are resolved relative to the directory of config.yaml.
+# Never commit .p8 keys, service account JSON files or config.yaml.
+#
+# Every metric is ENABLED BY DEFAULT. You only need a 'metrics:' block on an app
+# if you want to switch something off or change a limit (see the reference at the
+# end of this file).
+
+general:
+  output_directory: "./reports"   # where reports, CSV/JSON and the database are written
+  default_days: 30                # reporting period in days (override with --days)
+  csv: true                       # write one CSV per metric
+  json: true                      # write one JSON per metric
+  open_report: false              # open reports/overview.html in the browser after each run
+  database:
+    enabled: true                 # keep a full history of every run in SQLite
+    file: "./reports/store_reports.sqlite"
+
+# ============================================================
+# CUSTOMERS
+# ============================================================
+# Each customer (or provider/brand) has their own store accounts:
+# - apple:  one App Store Connect Team API key. It is account-wide, i.e. it works
+#           for every app of that customer - enter it once per customer.
+# - google: one Google Cloud service account. Usually one per customer, too.
+# An app can override any of these values in its own 'apple:' / 'google:' block.
+#
+# Output per app:   reports/<Customer>/<App>/<timestamp>/  (summary.html, CSV, JSON,
+#                                                           crashlogs/, diagnostics/)
+# Terminal output always shows "<Customer>: <App>" so you know what is being analyzed.
+# Set 'enabled: false' on a customer or an app to skip it without deleting it.
+
+customers:
+  - name: "BKK-RotWeiss"
+    enabled: true
+    apple:
+      key_id: "ABC123DEFG"                                   # App Store Connect -> Users and Access -> Integrations -> App Store Connect API
+      issuer_id: "00000000-0000-0000-0000-000000000000"      # shown above the key list on the same page
+      private_key_file: "./AuthKey_RWE.p8"                   # the .p8 file (can only be downloaded once)
+      vendor_number: "12345678"                              # Business -> Payments and Financial Reports; needed for Sales
+    apps:
+      - name: "ScanBox"
+        platform: "apple"
+        enabled: true
+        app_id: "1540650069"            # numeric Apple ID (App Store Connect -> App Information)
+        bundle_id: "net.drapatz.scanbox"
+        sku: "SCANBOX"                  # optional: includes in-app purchases in the Sales figures
+
+  - name: "BKK-Atomium"
+    enabled: true
+    apple:
+      key_id: "BVOR1234AB"
+      issuer_id: "11111111-2222-3333-4444-555555555555"
+      private_key_file: "./AuthKey_BKK.p8"
+      vendor_number: "00000000"
+    google:
+      service_account_file: "./bkk-service-account.json"
+      # Optional: Cloud Storage bucket of the Play Console bulk reports. Required for
+      # Google install/uninstall numbers and the full review history
+      # (Play Console -> Download reports -> Statistics,
+      # "Copy Cloud Storage URI", e.g. gs://pubsite_prod_rev_01234567890123456789/...).
+      reports_bucket: "pubsite_prod_rev_01234567890123456789"
+    apps:
+      - name: "Bkk Onetwoapps"
+        platform: "apple"
+        enabled: true
+        app_id: "0000000001"
+        bundle_id: "com.bkk.app"
+      - name: "ServiceApp"
+        platform: "google"
+        enabled: true
+        package_name: "com.bkk.serviceapp"
+        google:
+          # Example of an app-level override plus a metric switched off:
+          # service_account_file: "./serviceapp-only.json"
+          metrics:
+            excessive_wakeup_rate: false
+            error_reports: { limit: 50 }
+
+# ============================================================
+# APPS WITHOUT A CUSTOMER (optional, still supported)
+# ============================================================
+# Output path here: reports/<App>/<timestamp>/ (no customer directory).
+# 'customers:' and 'apps:' can be combined in the same file.
+apps: []
+
+# ============================================================
+# METRICS REFERENCE (defaults - everything is enabled)
+# ============================================================
+# Put any of these under <app>.apple.metrics or <app>.google.metrics to change them.
+# 'name: false' disables a metric, 'name: { key: value }' changes an option.
+#
+# apple:
+#   metrics:
+#     versions:           { platform: "IOS" }            # production version + latest TestFlight build (IOS, MAC_OS, TV_OS, VISION_OS)
+#     analytics:          { granularity: "DAILY" }       # Analytics Reports: downloads, installs/deletions, sessions,
+#                                                        # crashes, store views ... (first run creates the request;
+#                                                        # Apple delivers data after 1-2 days)
+#     analytics_history:  { granularity: "MONTHLY" }     # one-time historical snapshot (all-time totals)
+#     analytics_requests: []                             # extra, manually created requests: [{ request_id: "..." }]
+#     performance:        {}                             # Xcode metrics: hang rate, launch time, memory, battery, terminations
+#     diagnostics:        { limit: 20, download_logs: 5 }  # top hang/launch/disk-write signatures of the live build + logs
+#     testflight_crashes: { limit: 50, download_logs: 20 } # TestFlight crash reports incl. downloadable crash logs
+#     reviews:            { limit: 200, territories: [] }  # e.g. territories: ["DEU", "AUT", "CHE"]
+#     store_ratings:      { countries: ["DE", "AT", "CH", "US", "GB"] }  # official star rating per country (all ratings)
+#     charts:             { countries: ["DE", "AT", "CH", "US", "GB"] }  # chart position per country and category
+#                                                        # (Apple's public charts only go to rank 100)
+#     sales:              { report_type: "SALES", report_sub_type: "SUMMARY" }  # units, downloads, updates, proceeds
+#
+# google:
+#   metrics:
+#     versions:            { test_tracks: ["internal", "alpha", "beta"] }
+#     installs:            {}                 # needs reports_bucket (see above)
+#     crash_rate:          {}                 # user-perceived crash rate (Google threshold 1.09 %)
+#     anr_rate:            {}                 # user-perceived ANR rate (Google threshold 0.47 %)
+#     error_counts:        {}                 # crashes and ANRs per day
+#     error_issues:        { limit: 50 }      # grouped crash/ANR issues with cause and location
+#     error_reports:       { limit: 20 }      # single crash reports, stack traces saved as .txt
+#     slow_start_rate:     {}
+#     slow_rendering_rate: {}
+#     excessive_wakeup_rate: {}
+#     stuck_background_wakelock_rate: {}
+#     reviews:             { limit: 100, translation_language: null, history: true }
+#                                             # the API only returns the last 7 days; with reports_bucket
+#                                             # and history: true all reviews of the period are read
+#                                             # from the monthly Play Console exports
